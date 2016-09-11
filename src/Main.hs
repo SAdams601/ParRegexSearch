@@ -7,3 +7,4 @@ main = do
   packageContents <- readAllPackages
   print $ length packageContents
   return ()
+
