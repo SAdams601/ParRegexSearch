@@ -10,11 +10,10 @@ import Data.Char
 
 packages = "/home/stephen/Projects/ParRegexSearch/hackage/package/"
 
-readAllPackages :: IO [(FilePath,[(FilePath, B.ByteString)])]
-readAllPackages = do
-  dirs <- listDirectory packages
-  let fullPaths = map (\pn -> packages ++ pn) dirs
-      pat = "instance Applicative"
+readAllPackages :: FilePath -> IO [(FilePath,[(FilePath, B.ByteString)])]
+readAllPackages fp = do
+  dirs <- listDirectory fp
+  let fullPaths = map (\pn -> fp ++ "/" ++ pn) dirs
   unsafeInterleaveMapIO readDir fullPaths
     where
       searchPred fp = let ext = takeExtension fp in
@@ -23,15 +22,15 @@ readAllPackages = do
         contents <- getDirContentsByPred fp searchPred
         return (fp, contents)
 
-searchFileRead :: B.ByteString -> Int -> [(FilePath, B.ByteString)] -> [(FilePath, [B.ByteString])]
-searchFileRead _ _ [] = []
-searchFileRead pat extraLines ((fp,conts):rst) = (fp,matches): (searchFileRead pat extraLines rst)
+searchFile :: (B.ByteString -> Bool) -> Int -> [(FilePath, B.ByteString)] -> [(FilePath, [B.ByteString])]
+searchFile _ _ [] = []
+searchFile fun extraLines ((fp,conts):rst) = (fp,matches): (searchFile fun extraLines rst)
   where matches = formatMatches $ searchLines (lns conts)
         lns l = zip [1..] $ B.lines l
         searchLines :: [(Int,B.ByteString)] -> [(Int,B.ByteString)]
         searchLines [] = []
         searchLines (fst@(_, line):rst) =
-          if line =~ pat
+          if fun line
           then let (match, toSearch) = splitAt extraLines rst in
             (fst:(match ++ (searchLines toSearch)))
           else searchLines rst
@@ -43,21 +42,6 @@ searchFileRead pat extraLines ((fp,conts):rst) = (fp,matches): (searchFileRead p
           (B.append s (B.dropWhile isSpace match): r)         
 
 
-searchPackages :: IO ()
-searchPackages = do
-  dirs <- listDirectory packages
-  let fullPaths = map (\pn -> packages ++ pn) dirs
-      pat = "instance Applicative"
-      searchPred = (\fp -> let ext = takeExtension fp in
-                       return $ ext == ".hs" || ext == ".lhs")
-  res <- mapM (\fp -> searchDirWPred fp pat 3 searchPred) fullPaths
-  return ()
-
-{-
-parSearchDir :: FilePath -> String -> Eval [FileMatches]
-parSearchDir dir pat = do
-  let searchPred = (\fp -> let ext = takeExtension fp in
-                       return $ ext == ".hs" || ext == ".lhs")
-  lst <- rpar $ searchDirWPred dir pat 3 searchPred
-  lift lst
--}
+regexSearchFile :: B.ByteString -> Int -> [(FilePath, B.ByteString)] -> [(FilePath, [B.ByteString])]
+regexSearchFile _ _ [] = []
+regexSearchFile pat extraLines lst = searchFile (\ln -> ln =~ pat) extraLines lst
