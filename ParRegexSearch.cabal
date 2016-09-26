@@ -19,6 +19,7 @@ executable ParRegexSearch
   main-is:             Main.hs
   other-modules:       Search
                      , ParHackageSearch
+                     , StateFileProcessing
   -- other-extensions:    
   build-depends:       base >=4.8 && <4.9
                      , regex-posix
@@ -27,6 +28,7 @@ executable ParRegexSearch
                      , parallel
                      , unix
                      , bytestring
+                     , mtl
   hs-source-dirs:      src
   ghc-options: -O2 -threaded -rtsopts -eventlog
   default-language:    Haskell2010

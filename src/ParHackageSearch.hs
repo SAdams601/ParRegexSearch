@@ -21,27 +21,3 @@ readAllPackages fp = do
       readDir fp = do
         contents <- getDirContentsByPred fp searchPred
         return (fp, contents)
-
-searchFile :: (B.ByteString -> Bool) -> Int -> [(FilePath, B.ByteString)] -> [(FilePath, [B.ByteString])]
-searchFile _ _ [] = []
-searchFile fun extraLines ((fp,conts):rst) = (fp,matches): (searchFile fun extraLines rst)
-  where matches = formatMatches $ searchLines (lns conts)
-        lns l = zip [1..] $ B.lines l
-        searchLines :: [(Int,B.ByteString)] -> [(Int,B.ByteString)]
-        searchLines [] = []
-        searchLines (fst@(_, line):rst) =
-          if fun line
-          then let (match, toSearch) = splitAt extraLines rst in
-            (fst:(match ++ (searchLines toSearch)))
-          else searchLines rst
-        formatMatches :: [(Int, B.ByteString)] -> [B.ByteString]
-        formatMatches [] = []
-        formatMatches ((linNum, match):rst) = let s = B.pack $ (show linNum) ++ ": "
-                                                  r = formatMatches rst
-                                              in
-          (B.append s (B.dropWhile isSpace match): r)         
-
-
-regexSearchFile :: B.ByteString -> Int -> [(FilePath, B.ByteString)] -> [(FilePath, [B.ByteString])]
-regexSearchFile _ _ [] = []
-regexSearchFile pat extraLines lst = searchFile (\ln -> ln =~ pat) extraLines lst
