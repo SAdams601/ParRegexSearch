@@ -5,13 +5,25 @@ import System.FilePath.Posix
 import qualified Data.ByteString.Char8 as B
 import System.Environment
 import StateFileProcessing
-  
+import Control.Exception.Base
+import Data.Time.Clock
+import Text.Printf
+
 main :: IO ()
 main = do
   (fp:_) <- getArgs
+  t0 <- getCurrentTime
   packageContents <- readAllPackages fp
-  let res = parFileSearch2 packageContents
+  t1 <- getCurrentTime
+  res <- evaluate $ parFileSearch2 packageContents
+  t2 <- getCurrentTime
   showSearchResults res
+  t3 <- getCurrentTime
+  --Line taken from: https://github.com/simonmar/parconc-examples/blob/master/kmeans/kmeans.hs#L70
+  printf "Total time on IO: %.2f\n" (realToFrac (diffUTCTime t1 t0) :: Double)
+  printf "Total time on search: %.2f\n" (realToFrac (diffUTCTime t2 t1) :: Double)
+  printf "Total time on print: %.2f\n" (realToFrac (diffUTCTime t3 t2) :: Double)
+  
 
 type DirContents = (FilePath,[(FilePath, B.ByteString)])
 type SearchRes = (FilePath,[(FilePath, [Match])])

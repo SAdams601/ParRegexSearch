@@ -29,6 +29,8 @@ executable ParRegexSearch
                      , unix
                      , bytestring
                      , mtl
+                     , time
+                     , deepseq
   hs-source-dirs:      src
   ghc-options: -O2 -threaded -rtsopts -eventlog
   default-language:    Haskell2010
