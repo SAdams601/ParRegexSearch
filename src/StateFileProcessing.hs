@@ -1,6 +1,6 @@
 module StateFileProcessing where
 import Control.Monad.State
-import Data.ByteString.Char8
+import Data.ByteString.Char8 as BS
 import Prelude hiding (lines)
 import Text.Regex.Posix
 
@@ -41,3 +41,19 @@ appInstancePred (ln:lns) = if ln =~ (pack "instance Applicative")
                            then let match = ln : Prelude.take 2 lns in
                                   (match, Prelude.drop 2 lns)
                            else ([], lns)
+
+pureIsAp :: [ByteString] -> (Match,[ByteString])
+pureIsAp (ln:lns) = if ln =~ (pack "instance Applicative")
+                           then let (appLn, rst) = findAp lns in
+                                  if (BS.null appLn)
+                                  then ([], rst)
+                                  else ([ln,appLn], rst)
+                           else ([], lns)
+  where
+    findAp :: [ByteString] -> (ByteString, [ByteString])
+    findAp [] = (BS.empty,[])
+    findAp (l:rst) = if l =~ (pack "\\(<\\*>\\)\\s*=\\s*ap")
+                     then (l,rst)
+                     else findAp rst
+
+--"<\\*>.*=.*(`| )ap(`| )"

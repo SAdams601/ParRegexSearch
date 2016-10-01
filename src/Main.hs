@@ -15,9 +15,10 @@ main = do
   t0 <- getCurrentTime
   packageContents <- readAllPackages fp
   t1 <- getCurrentTime
-  res <- evaluate $ parFileSearch2 packageContents
+  res <- evaluate $ parFileSearch3 packageContents
   t2 <- getCurrentTime
   showSearchResults res
+  showSearchResStats res
   t3 <- getCurrentTime
   --Line taken from: https://github.com/simonmar/parconc-examples/blob/master/kmeans/kmeans.hs#L70
   printf "Total time on IO: %.2f\n" (realToFrac (diffUTCTime t1 t0) :: Double)
@@ -28,6 +29,14 @@ main = do
 type DirContents = (FilePath,[(FilePath, B.ByteString)])
 type SearchRes = (FilePath,[(FilePath, [Match])])
 
+showSearchResStats :: [SearchRes] -> IO ()
+showSearchResStats srs = do
+  let (fc, mc) = foldl (\(a1,b1) (a2,b2) -> (a1+a2, b1+b2)) (0,0) (map fun srs)
+  putStrLn $ "A total of " ++ (show mc) ++ " matches were found in " ++ (show fc) ++ " files."
+  where    
+    fun (dirP, lst) = let mCount = foldl (\n (_, l) -> n + length l) 0 lst in
+          (length lst, mCount)
+
 regex = B.pack $ "instance Monad"
 
 
@@ -35,7 +44,11 @@ parFileSearch2 :: [DirContents] -> [SearchRes]
 parFileSearch2 = parMap rseq fun
   where fun (dir, files) = let res = searchListOfFiles appInstancePred files in
           (dir, res)
-  
+
+parFileSearch3 :: [DirContents] -> [SearchRes]
+parFileSearch3 = parMap rseq fun
+  where fun (dir, files) = let res = searchListOfFiles pureIsAp files in
+          (dir, res)
 
 searchFiles :: [DirContents] -> Eval [SearchRes]
 searchFiles fs = do
