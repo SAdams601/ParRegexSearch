@@ -8,6 +8,7 @@ import StateFileProcessing
 import Control.Exception.Base
 import Data.Time.Clock
 import Text.Printf
+import FindTypes
 
 main :: IO ()
 main = do
@@ -15,7 +16,7 @@ main = do
   t0 <- getCurrentTime
   packageContents <- readAllPackages fp
   t1 <- getCurrentTime
-  res <- evaluate $ parFileSearch3 packageContents
+  res <- evaluate $ findMonadInstances packageContents
   t2 <- getCurrentTime
   showSearchResults res
   showSearchResStats res
@@ -39,14 +40,18 @@ showSearchResStats srs = do
 
 regex = B.pack $ "instance Monad"
 
-
-parFileSearch2 :: [DirContents] -> [SearchRes]
-parFileSearch2 = parMap rseq fun
+findAppInstances :: [DirContents] -> [SearchRes]
+findAppInstances = parMap rseq fun
   where fun (dir, files) = let res = searchListOfFiles appInstancePred files in
           (dir, res)
 
-parFileSearch3 :: [DirContents] -> [SearchRes]
-parFileSearch3 = parMap rseq fun
+findMonadInstances :: [DirContents] -> [SearchRes]
+findMonadInstances = parMap rseq fun
+  where fun (dir, files) = let res = searchListOfFiles monadInstancePred files in
+          (dir, res)
+
+appPureIsAp :: [DirContents] -> [SearchRes]
+appPureIsAp = parMap rseq fun
   where fun (dir, files) = let res = searchListOfFiles pureIsAp files in
           (dir, res)
 

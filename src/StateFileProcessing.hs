@@ -42,6 +42,12 @@ appInstancePred (ln:lns) = if ln =~ (pack "instance Applicative")
                                   (match, Prelude.drop 2 lns)
                            else ([], lns)
 
+monadInstancePred :: [ByteString] -> (Match,[ByteString])
+monadInstancePred (ln:lns) = if ln =~ (pack "instance Monad\\s")
+                           then let match = ln : Prelude.take 2 lns in
+                                  (match, Prelude.drop 2 lns)
+                           else ([], lns)
+
 pureIsAp :: [ByteString] -> (Match,[ByteString])
 pureIsAp (ln:lns) = if ln =~ (pack "instance Applicative")
                            then let (appLn, rst) = findAp lns in
@@ -57,3 +63,4 @@ pureIsAp (ln:lns) = if ln =~ (pack "instance Applicative")
                      else findAp rst
 
 --"<\\*>.*=.*(`| )ap(`| )"
+
