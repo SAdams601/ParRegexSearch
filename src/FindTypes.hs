@@ -21,24 +21,36 @@ instance Eq TypeSum where
 
 data SearchMap = Map ByteString TypeSum                       
 
+data SearchRecord = S {mp :: SearchMap,
+                       lns :: [ByteString]}
 
+type SearchState = State SearchRecord
 
 isBothInstances :: TypeSum -> Bool
 isBothInstances t = hasMonad t && hasApplicative t
 
---searchFiles :: [(FilePath, ByteString)] ->
---searchFiles
+-- Is this a fold?
+-- Need to go through the list of files and thread the searchmap produced by searchComp in order
+-- Or does map support something like unionWith?
+-- Map the search then fold the list with unionWith which combines the maps
 
-searchComp :: SearchMap -> FileState SearchMap
-searchComp map = do
-  rest <- get
-  case rest of
-    [] -> return empty
-    lns -> do
-      let (tss,rst) = findInstances lns map
-      put rst
-      map2 <- searchComp map
-      return $ merge tss map2
+searchFiles :: [(FilePath, ByteString)] -> SearchMap
+searchFiles files = undefined
 
-findInstances :: [ByteString] -> SearchMap -> (SearchMap, [ByteString])
-findInstances (ln:lns) map = undefined
+--This searches and entire file
+searchFile :: SearchMap -> ByteString -> SearchMap
+searchFile map file = evalState searchComp (S map (BS.lines file))
+  where
+    searchComp :: SearchState SearchMap
+    searchComp = do
+      state <- get
+      case (lns state) of
+        [] -> return $ mp state
+        _ -> do
+          let newState = findInstances state
+          put newState
+          map2 <- searchComp
+          return map2
+
+findInstances :: SearchRecord -> SearchRecord
+findInstances S {mp=m, lns=(l:ls)} = undefined
