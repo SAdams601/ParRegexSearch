@@ -1,16 +1,18 @@
+{-# LANGUAGE FlexibleContexts #-}
 module FindTypes where
 import Data.ByteString.Char8 as BS
 import Text.Regex.Posix
-import StateFileProcessing
+import StateFileProcessing hiding (searchFile)
 import Control.Monad.State
 import Data.Map as Map
 
 data TypeSum = T{ typeName :: ByteString,
                   hasMonad :: Bool,
-                  hasApplicative :: Bool,
+                  hasApp :: Bool,
                   monadLoc :: Maybe FilePath,
                   appLoc :: Maybe FilePath
                 }
+               deriving Show
 
 emptySum :: ByteString -> TypeSum
 emptySum name = T name False False Nothing Nothing
@@ -19,27 +21,27 @@ emptySum name = T name False False Nothing Nothing
 instance Eq TypeSum where
   x == y = (typeName x) == (typeName y)
 
-data SearchMap = Map ByteString TypeSum                       
+type SearchMap = Map ByteString TypeSum                       
 
 data SearchRecord = S {mp :: SearchMap,
-                       lns :: [ByteString]}
+                       lns :: [ByteString],
+                       fp :: FilePath}
 
 type SearchState = State SearchRecord
 
 isBothInstances :: TypeSum -> Bool
-isBothInstances t = hasMonad t && hasApplicative t
+isBothInstances t = hasMonad t && hasApp t
 
--- Is this a fold?
--- Need to go through the list of files and thread the searchmap produced by searchComp in order
--- Or does map support something like unionWith?
--- Map the search then fold the list with unionWith which combines the maps
+--This could be a fold except then if two types have the same names in different projects the map would overwrite. I could solve this by having a filepath also be part of the key but I'd rather keep it simpler for now.
 
-searchFiles :: [(FilePath, ByteString)] -> SearchMap
-searchFiles files = undefined
+genMaps :: [(FilePath, ByteString)] -> [SearchMap]
+genMaps files = Prelude.map f files
+  where
+    f (fp,bs) = searchFile fp Map.empty bs
 
 --This searches and entire file
-searchFile :: SearchMap -> ByteString -> SearchMap
-searchFile map file = evalState searchComp (S map (BS.lines file))
+searchFile :: FilePath -> SearchMap -> ByteString -> SearchMap
+searchFile fp map file = evalState searchComp (S map (BS.lines file) fp)
   where
     searchComp :: SearchState SearchMap
     searchComp = do
@@ -47,10 +49,38 @@ searchFile map file = evalState searchComp (S map (BS.lines file))
       case (lns state) of
         [] -> return $ mp state
         _ -> do
-          let newState = findInstances state
-          put newState
+          let newRecord = findInstances state
+          case newRecord of
+            Nothing -> return ()
+            (Just record) -> put record
           map2 <- searchComp
           return map2
 
-findInstances :: SearchRecord -> SearchRecord
-findInstances S {mp=m, lns=(l:ls)} = undefined
+findInstances :: SearchRecord -> Maybe SearchRecord
+findInstances S {mp=m, lns=(l:ls), fp = fp} =
+  let appMatch = isAppInstance l
+      monadMatch = isMonadInstance l
+  in
+  
+  if BS.null appMatch
+  then if BS.null monadMatch
+       then Nothing
+       else
+         let newMap = packMonad m monadMatch fp in
+         Just (S newMap ls fp)
+  else
+    let newMap = packApp m monadMatch fp in
+    Just (S newMap ls fp)
+  where
+    isAppInstance ln = ln =~ pack "instance Applicative\\s+(.+)\\swhere"
+    isMonadInstance ln = ln =~ pack "instance Monad\\s+(.+)\\swhere"
+    packMonad :: SearchMap -> ByteString -> FilePath -> SearchMap
+    packMonad map ty fp = let oldTySum = Map.lookup ty map in
+      case oldTySum of
+        Nothing -> Map.insert ty (T ty True False (Just fp) Nothing) map
+        Just tSum -> Map.insert ty (tSum {hasMonad = True, monadLoc = Just fp}) map
+    packApp :: SearchMap -> ByteString -> FilePath -> SearchMap
+    packApp map ty fp = let oldTySum = Map.lookup ty map in
+      case oldTySum of
+        Nothing -> Map.insert ty (T ty False True Nothing (Just fp)) map
+        Just tSum -> Map.insert ty (tSum {hasApp = True, appLoc = Just fp}) map

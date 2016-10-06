@@ -16,10 +16,9 @@ main = do
   t0 <- getCurrentTime
   packageContents <- readAllPackages fp
   t1 <- getCurrentTime
-  res <- evaluate $ findMonadInstances packageContents
+  let res = getTypeSums packageContents
   t2 <- getCurrentTime
-  showSearchResults res
-  showSearchResStats res
+  showTypeSums res
   t3 <- getCurrentTime
   --Line taken from: https://github.com/simonmar/parconc-examples/blob/master/kmeans/kmeans.hs#L70
   printf "Total time on IO: %.2f\n" (realToFrac (diffUTCTime t1 t0) :: Double)
@@ -29,6 +28,9 @@ main = do
 
 type DirContents = (FilePath,[(FilePath, B.ByteString)])
 type SearchRes = (FilePath,[(FilePath, [Match])])
+
+showTypeSums :: [(FilePath, [SearchMap])] -> IO ()
+showTypeSums res = undefined
 
 showSearchResStats :: [SearchRes] -> IO ()
 showSearchResStats srs = do
@@ -49,6 +51,11 @@ findMonadInstances :: [DirContents] -> [SearchRes]
 findMonadInstances = parMap rseq fun
   where fun (dir, files) = let res = searchListOfFiles monadInstancePred files in
           (dir, res)
+
+getTypeSums :: [DirContents] -> [(FilePath,[SearchMap])]
+getTypeSums = parMap rseq fun
+  where fun (dir, files) = let maps = genMaps files in
+          (dir, maps)
 
 appPureIsAp :: [DirContents] -> [SearchRes]
 appPureIsAp = parMap rseq fun
