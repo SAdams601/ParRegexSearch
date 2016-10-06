@@ -5,6 +5,7 @@ import Text.Regex.Posix
 import StateFileProcessing hiding (searchFile)
 import Control.Monad.State
 import Data.Map as Map
+import Data.Maybe (fromJust)
 
 data TypeSum = T{ typeName :: ByteString,
                   hasMonad :: Bool,
@@ -12,11 +13,21 @@ data TypeSum = T{ typeName :: ByteString,
                   monadLoc :: Maybe FilePath,
                   appLoc :: Maybe FilePath
                 }
-               deriving Show
 
 emptySum :: ByteString -> TypeSum
 emptySum name = T name False False Nothing Nothing
 
+instance Show TypeSum where
+  show ts = let ln1 = "The type: " ++ unpack (typeName ts) ++ "\n"
+                ln2 = if (hasMonad ts)
+                      then "has a monad instance in " ++ (fromJust (monadLoc ts))
+                      else "does not have a monad instance\n"
+                ln3 = if (hasApp ts)
+                      then "it's applicative instance can be found in " ++ (fromJust (appLoc ts))
+                      else "it does not have an applicative instance.\n"
+                lnEqs = "========================================\n" in
+            lnEqs ++ ln1 ++ ln2 ++ ln3 ++ lnEqs
+                
                            
 instance Eq TypeSum where
   x == y = (typeName x) == (typeName y)

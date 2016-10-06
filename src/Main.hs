@@ -15,8 +15,10 @@ main = do
   (fp:_) <- getArgs
   t0 <- getCurrentTime
   packageContents <- readAllPackages fp
+  putStrLn "Done reading packages"
   t1 <- getCurrentTime
-  let res = getTypeSums packageContents
+  res <- evaluate $ getTypeSums packageContents
+  putStrLn "Gotten sums attempting to output"
   t2 <- getCurrentTime
   showTypeSums res
   t3 <- getCurrentTime
@@ -30,7 +32,11 @@ type DirContents = (FilePath,[(FilePath, B.ByteString)])
 type SearchRes = (FilePath,[(FilePath, [Match])])
 
 showTypeSums :: [(FilePath, [SearchMap])] -> IO ()
-showTypeSums res = undefined
+showTypeSums res = mapM_ showRes res
+  where showRes :: (FilePath, [SearchMap]) -> IO ()
+        showRes (pName, maps) = do
+          putStrLn $ "Results from the package: " ++ pName
+          mapM_ print maps
 
 showSearchResStats :: [SearchRes] -> IO ()
 showSearchResStats srs = do

@@ -8,6 +8,7 @@ import qualified Data.ByteString.Char8 as B
 import Data.Char
 import System.Mem
 import Control.DeepSeq
+import Control.Monad
 
 packages = "/home/stephen/Projects/ParRegexSearch/hackage/package/"
 
@@ -15,7 +16,8 @@ readAllPackages :: FilePath -> IO [(FilePath,[(FilePath, B.ByteString)])]
 readAllPackages fp = do
   dirs <- listDirectory fp
   let fullPaths = map (\pn -> fp ++ "/" ++ pn) dirs
-  res <- mapM readDir fullPaths
+  onlyDirs <- filterM doesDirectoryExist fullPaths
+  res <- mapM readDir onlyDirs
   let fr = force res
   performGC
   return $ fr
