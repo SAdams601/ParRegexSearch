@@ -20,7 +20,7 @@ emptySum name = T name False False Nothing Nothing
 instance Show TypeSum where
   show ts = let ln1 = "The type: " ++ unpack (typeName ts) ++ "\n"
                 ln2 = if (hasMonad ts)
-                      then "has a monad instance in " ++ (fromJust (monadLoc ts))
+                      then "has a monad instance in " ++ (fromJust (monadLoc ts)) ++ "\n"
                       else "does not have a monad instance\n"
                 ln3 = if (hasApp ts)
                       then "it's applicative instance can be found in " ++ (fromJust (appLoc ts)) ++ "\n"
