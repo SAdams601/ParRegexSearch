@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module FindTypes where
 import Data.ByteString.Char8 as BS
-import Text.Regex.Posix
+import Text.Regex.PCRE
 import StateFileProcessing hiding (searchFile)
 import Control.Monad.State
 import Data.Map as Map
@@ -23,7 +23,7 @@ instance Show TypeSum where
                       then "has a monad instance in " ++ (fromJust (monadLoc ts))
                       else "does not have a monad instance\n"
                 ln3 = if (hasApp ts)
-                      then "it's applicative instance can be found in " ++ (fromJust (appLoc ts))
+                      then "it's applicative instance can be found in " ++ (fromJust (appLoc ts)) ++ "\n"
                       else "it does not have an applicative instance.\n"
                 lnEqs = "========================================\n" in
             lnEqs ++ ln1 ++ ln2 ++ ln3 ++ lnEqs
@@ -61,30 +61,33 @@ searchFile fp map file = evalState searchComp (S map (BS.lines file) fp)
         [] -> return $ mp state
         _ -> do
           let newRecord = findInstances state
-          case newRecord of
-            Nothing -> return ()
-            (Just record) -> put record
+          put newRecord
           map2 <- searchComp
           return map2
 
-findInstances :: SearchRecord -> Maybe SearchRecord
+findInstances :: SearchRecord -> SearchRecord
 findInstances S {mp=m, lns=(l:ls), fp = fp} =
   let appMatch = isAppInstance l
       monadMatch = isMonadInstance l
   in
-  
   if BS.null appMatch
   then if BS.null monadMatch
-       then Nothing
+       then (S m ls fp)
        else
          let newMap = packMonad m monadMatch fp in
-         Just (S newMap ls fp)
+         (S newMap ls fp)
   else
-    let newMap = packApp m monadMatch fp in
-    Just (S newMap ls fp)
+    let newMap = packApp m appMatch fp in
+    (S newMap ls fp)
   where
-    isAppInstance ln = ln =~ pack "instance Applicative\\s+(.+)\\swhere"
-    isMonadInstance ln = ln =~ pack "instance Monad\\s+(.+)\\swhere"
+    isAppInstance ln = let res = ln =~ pack "instance Applicative\\s+(.+)\\s+where" in
+      case res of
+      [[_,match]] -> match
+      _ -> BS.empty
+    isMonadInstance ln = let res = ln =~ pack "instance Monad\\s+(.+)\\s+where" in
+      case res of
+      [[_,match]] -> match
+      _ -> BS.empty
     packMonad :: SearchMap -> ByteString -> FilePath -> SearchMap
     packMonad map ty fp = let oldTySum = Map.lookup ty map in
       case oldTySum of

@@ -9,6 +9,8 @@ import Control.Exception.Base
 import Data.Time.Clock
 import Text.Printf
 import FindTypes
+import qualified Data.Map as Map
+import Control.DeepSeq
 
 main :: IO ()
 main = do
@@ -36,7 +38,10 @@ showTypeSums res = mapM_ showRes res
   where showRes :: (FilePath, [SearchMap]) -> IO ()
         showRes (pName, maps) = do
           putStrLn $ "Results from the package: " ++ pName
-          mapM_ print maps
+          putStrLn $ (show $ length maps) ++ " files were searched."
+          let allTySums = (foldr (++) [] (map Map.elems maps))
+          putStrLn $ (show $ length allTySums) ++ " summaries were found."
+          mapM_ print allTySums
 
 showSearchResStats :: [SearchRes] -> IO ()
 showSearchResStats srs = do
