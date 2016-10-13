@@ -24,7 +24,7 @@ executable ParRegexSearch
   -- other-extensions:    
   build-depends:       base >=4.8 && <4.9
                      , regex-posix
-                     , directory >= 1.2.5.0
+                     , directory
                      , filepath
                      , parallel
                      , unix
@@ -34,6 +34,7 @@ executable ParRegexSearch
                      , deepseq
                      , containers
                      , regex-pcre
+                     , ghc-exactprint
   hs-source-dirs:      src
   ghc-options: -O2 -threaded -rtsopts -eventlog
   default-language:    Haskell2010

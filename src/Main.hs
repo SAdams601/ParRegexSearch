@@ -11,37 +11,71 @@ import Text.Printf
 import FindTypes
 import qualified Data.Map as Map
 import Control.DeepSeq
+import System.IO
+import ExactPrintSearch
 
 main :: IO ()
 main = do
   (fp:_) <- getArgs
   t0 <- getCurrentTime
-  packageContents <- readAllPackages fp
+  res <- exactPrintSearch fp
+  print res
+{-  packageContents <- readAllPackages fp
   putStrLn "Done reading packages"
   t1 <- getCurrentTime
   res <- evaluate $ getTypeSums packageContents
   putStrLn "Gotten sums attempting to output"
   t2 <- getCurrentTime
   showTypeSums res
+  outputResults res
   t3 <- getCurrentTime
   --Line taken from: https://github.com/simonmar/parconc-examples/blob/master/kmeans/kmeans.hs#L70
   printf "Total time on IO: %.2f\n" (realToFrac (diffUTCTime t1 t0) :: Double)
   printf "Total time on search: %.2f\n" (realToFrac (diffUTCTime t2 t1) :: Double)
   printf "Total time on print: %.2f\n" (realToFrac (diffUTCTime t3 t2) :: Double)
-  
+-}
 
 type DirContents = (FilePath,[(FilePath, B.ByteString)])
 type SearchRes = (FilePath,[(FilePath, [Match])])
 
 showTypeSums :: [(FilePath, [SearchMap])] -> IO ()
 showTypeSums res = mapM_ showRes res
-  where showRes :: (FilePath, [SearchMap]) -> IO ()
-        showRes (pName, maps) = do
-          putStrLn $ "Results from the package: " ++ pName
-          putStrLn $ (show $ length maps) ++ " files were searched."
-          let allTySums = (foldr (++) [] (map Map.elems maps))
-          putStrLn $ (show $ length allTySums) ++ " summaries were found."
-          mapM_ print allTySums
+
+showResWHandle :: Handle -> (FilePath, [SearchMap]) -> IO ()
+showResWHandle h (pName, maps) = do
+  let sumNum = length allTySums
+      allTySums = (foldr (++) [] (map Map.elems maps))
+  if sumNum == 0
+    then return ()
+    else do
+       hPutStrLn h $ "Results from the package: " ++ pName
+       hPutStrLn h $ (show $ length maps) ++ " files were searched."
+       hPutStrLn h $ (show sumNum) ++ " summaries were found."
+       mapM_ (hPrint h) allTySums
+
+showRes :: (FilePath, [SearchMap]) -> IO ()
+showRes = showResWHandle stdout
+
+writeRes :: FilePath -> (FilePath, [SearchMap]) -> IO ()
+writeRes fp res = do
+  handle <- openFile fp AppendMode
+  showResWHandle handle res
+  hClose handle
+
+outputResults :: [(FilePath, [SearchMap])] -> IO ()
+outputResults res = do
+  let bothInstances = filterHasBoth res
+      onlyM = filterOnlyMonad res
+      onlyA = filterOnlyApp res
+      bp = "hasBoth.txt"
+      mp = "hasMonad.txt"
+      ap = "hasApp.txt"
+  mapM_ (writeRes bp) bothInstances
+  mapM_ (writeRes mp) onlyM
+  mapM_ (writeRes ap) onlyA
+  putStrLn $ (show (countInstances bothInstances)) ++ " types were found which defined both instances."
+  putStrLn $ (show (countInstances onlyM)) ++ " types were found which only defined the monadic instance."
+  putStrLn $ (show (countInstances onlyA)) ++ " types were found which only defined the applicative instance."
 
 showSearchResStats :: [SearchRes] -> IO ()
 showSearchResStats srs = do
@@ -52,6 +86,13 @@ showSearchResStats srs = do
           (length lst, mCount)
 
 regex = B.pack $ "instance Monad"
+
+exactPrintSearch :: FilePath -> IO [(FilePath,[SearchMap])]
+exactPrintSearch fp = do
+  files <- getAllFileNames fp
+  print files
+  maps <- mapM (\(pName, fs) -> do{mp <- searchPackage fs; return (pName, mp)}) files
+  return []
 
 findAppInstances :: [DirContents] -> [SearchRes]
 findAppInstances = parMap rseq fun

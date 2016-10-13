@@ -63,3 +63,32 @@ getDirContentsByPred dir pred = do
                 contents <- B.readFile fp
                 return [(fp,contents)]
                 else return []
+
+     
+
+getFileNamesByPred :: FilePath -> (FilePath -> IO Bool) -> IO [FilePath]
+getFileNamesByPred dir pred = do
+  abs <- makeAbsolute dir
+  dirContents <- listDirectory dir
+  let files = map (fixFP abs) dirContents
+  res <- mapM (r abs) files
+  return $ foldl (++) [] res
+    where
+      fixFP dir fp = dir ++ "/" ++ fp
+      r dir fp = do
+        status <- getFileStatus $ pack fp
+        if isDirectory status
+          then getFileNamesByPred fp pred
+          else do
+          b <- pred fp
+          if b
+            then return [fp]
+            else return []
+            
+        
+
+
+listDirectory :: FilePath -> IO [FilePath]
+listDirectory fp = do
+  contents <- getDirectoryContents fp
+  return $ filter (\fp -> not (fp == ".." || fp == ".")) contents

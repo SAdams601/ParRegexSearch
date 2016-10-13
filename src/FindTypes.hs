@@ -17,6 +17,26 @@ data TypeSum = T{ typeName :: ByteString,
 emptySum :: ByteString -> TypeSum
 emptySum name = T name False False Nothing Nothing
 
+filterHasBoth :: [(FilePath, [SearchMap])] -> [(FilePath, [SearchMap])]
+filterHasBoth = filterSearchRes (\t -> hasApp t && hasMonad t)
+
+filterOnlyMonad :: [(FilePath, [SearchMap])] -> [(FilePath, [SearchMap])]
+filterOnlyMonad = filterSearchRes (\t -> (not $ hasApp t) && hasMonad t)
+
+filterOnlyApp :: [(FilePath, [SearchMap])] -> [(FilePath, [SearchMap])]
+filterOnlyApp = filterSearchRes (\t -> hasApp t && (not $ hasMonad t))
+
+filterSearchRes :: (TypeSum -> Bool) -> [(FilePath, [SearchMap])] -> [(FilePath, [SearchMap])]
+filterSearchRes pred lst =
+  let
+    fLst :: [SearchMap] -> [SearchMap]
+    fLst l = Prelude.map (Map.filter pred) l
+    filteredLst = Prelude.map (\(fp, l) -> (fp, fLst l)) lst in
+  Prelude.filter (\(fp, l) -> Prelude.not (Prelude.null l)) filteredLst
+
+countInstances :: [(FilePath, [SearchMap])] -> Int
+countInstances lst = sum (Prelude.map sum (Prelude.map (\(_, mps) -> Prelude.map Map.size mps) lst))
+
 instance Show TypeSum where
   show ts = let ln1 = "The type: " ++ unpack (typeName ts) ++ "\n"
                 ln2 = if (hasMonad ts)
@@ -80,14 +100,28 @@ findInstances S {mp=m, lns=(l:ls), fp = fp} =
     let newMap = packApp m appMatch fp in
     (S newMap ls fp)
   where
-    isAppInstance ln = let res = ln =~ pack "instance Applicative\\s+(.+)\\s+where" in
-      case res of
-      [[_,match]] -> match
-      _ -> BS.empty
-    isMonadInstance ln = let res = ln =~ pack "instance Monad\\s+(.+)\\s+where" in
-      case res of
-      [[_,match]] -> match
-      _ -> BS.empty
+    isAppInstance ln =
+      let res1 = ln =~ pack "instance Applicative\\s+(.+)\\s+where"
+          res2 = ln =~ pack "instance[a-zA-Z\\s]+\\s*=>\\s*Applicative\\s+(.+)\\s+where"
+          res3 = ln =~ pack "instance\\s+Applicative\\s+[a-z]\\s+=>\\s+(.+)\\s+where"
+      in
+      case res2 of
+        [[_,match]] -> match
+        _ ->
+          case (res1,res3) of
+            ([[_,match]],False) -> match
+            _ -> BS.empty
+    isMonadInstance ln =
+      let res1 = ln =~ pack "instance Monad\\s+(.+)\\s+where"
+          res2 = ln =~ pack "instance[a-zA-Z\\s]+\\s*=>\\s*Monad\\s+(.+)\\s+where"
+          res3 = ln =~ pack "instance\\s+Monad\\s+[a-z]\\s+=>\\s+(.+)\\s+where"
+      in
+      case res2 of
+        [[_,match]] -> match
+        _ ->
+          case (res1,res3) of
+            ([[_,match]],False) -> match
+            _ -> BS.empty
     packMonad :: SearchMap -> ByteString -> FilePath -> SearchMap
     packMonad map ty fp = let oldTySum = Map.lookup ty map in
       case oldTySum of

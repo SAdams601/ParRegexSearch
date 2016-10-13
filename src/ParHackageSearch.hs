@@ -21,11 +21,21 @@ readAllPackages fp = do
   let fr = force res
   performGC
   return $ fr
-    where
-      searchPred fp = let ext = takeExtension fp in
-        return $ ext == ".hs" || ext == ".lhs"
-      readDir fp = do
-        contents <- getDirContentsByPred fp searchPred
-        return (fp, contents)
 
+getAllFileNames :: FilePath -> IO [(FilePath, [FilePath])]
+getAllFileNames fp = do
+  dirs <- listDirectory fp
+  let fullPaths = map (\pn -> fp ++ "/" ++ pn) dirs
+  onlyDirs <- filterM doesDirectoryExist fullPaths
+  mapM f onlyDirs
+  where
+    f dir = do
+      files <- getFileNamesByPred dir searchPred
+      return (dir, files)
 
+searchPred fp = let ext = takeExtension fp in
+  return $ ext == ".hs" || ext == ".lhs"
+readDir fp = do
+  contents <- getDirContentsByPred fp searchPred
+  return (fp, contents)
+  
