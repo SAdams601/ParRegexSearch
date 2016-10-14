@@ -19,7 +19,7 @@ main = do
   (fp:_) <- getArgs
   t0 <- getCurrentTime
   res <- exactPrintSearch fp
-  print res
+  mapM_ showDeclMp res
 {-  packageContents <- readAllPackages fp
   putStrLn "Done reading packages"
   t1 <- getCurrentTime
@@ -87,12 +87,12 @@ showSearchResStats srs = do
 
 regex = B.pack $ "instance Monad"
 
-exactPrintSearch :: FilePath -> IO [(FilePath,[SearchMap])]
+exactPrintSearch :: FilePath -> IO [(FilePath,DeclMap)]
 exactPrintSearch fp = do
   files <- getAllFileNames fp
-  print files
+--  print files
   maps <- mapM (\(pName, fs) -> do{mp <- searchPackage fs; return (pName, mp)}) files
-  return []
+  return maps
 
 findAppInstances :: [DirContents] -> [SearchRes]
 findAppInstances = parMap rseq fun
