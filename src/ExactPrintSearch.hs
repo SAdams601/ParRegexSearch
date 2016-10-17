@@ -15,23 +15,32 @@ import qualified Data.Generics as SYB
 import qualified GHC.SYB.Utils as SYB
 import qualified RdrName as GHC
 import System.IO.Unsafe
+import Control.Exception
 
 searchPackage :: [FilePath] -> IO DeclMap
 searchPackage files = foldlM searchFile Map.empty files
+
+catchAny :: IO a -> (SomeException -> IO a) -> IO a
+catchAny = Control.Exception.catch
   
 searchFile :: DeclMap -> FilePath -> IO DeclMap
 searchFile map fp = do
-  parse <- parseModule fp
+  putStrLn fp
+  parse <- catchAny (parseModule fp) $ \e -> do
+    appendFile "errors.txt" ("Fatal parse exception in " ++ fp)
+    appendFile "errors.txt" ((show e) ++ "\n===================\n")
+    return (Left (GHC.noSrcSpan , (show e)))
   case parse of
     Left (_,err) -> do
       putStrLn "Parse error occured: "
       putStrLn err
       return Map.empty
     Right (anns, ps) -> do
+      putStrLn "Right hand parse res"
       let mQual = checkForQualifiedMonad ps
           aQual = checkForQualifiedApplicative ps
           allInstances = findInstances (aQual,mQual) ps
-      return $ packMap anns allInstances
+      return $ Map.union map (packMap anns allInstances)
 
 
 
@@ -59,13 +68,43 @@ instance Show DeclSum where
                       "Has an applicative instance:\n" ++ exactPrint ad anns ++ "\n"
                     else "Does not define a applicative instance.\n"
 
-showDeclMp (fp, dm) = do
-  let str = "==========================\n" ++ "Package: " ++ fp ++ "\n" ++ (show $ Map.elems dm)
-  putStrLn str
+impBoth :: DeclSum -> Bool
+impBoth ds = hasA ds && hasM ds
 
-                                      
+impAppOnly :: DeclSum -> Bool
+impAppOnly ds = hasA ds && not (hasM ds)
+
+impMonadOnly :: DeclSum -> Bool
+impMonadOnly ds = not (hasA ds) && hasM ds
+
+splitDeclMap :: DeclMap -> (DeclMap, DeclMap, DeclMap)
+splitDeclMap dm = (Map.filter impBoth dm, Map.filter impAppOnly dm, Map.filter impMonadOnly dm)
+
+showDeclMp :: (FilePath, DeclMap) -> IO ()
+showDeclMp tpl = putStrLn $ declMpStr tpl
+
+declMpStr :: (FilePath, DeclMap) -> String
+declMpStr (fp,dm) = "==========================\nPackage: " ++ fp ++ "\n" ++ (show $ Map.elems dm)
+
 showData :: SYB.Data a => a -> String
 showData = SYB.showData SYB.Parser 3
+
+outputDeclMap :: (FilePath, DeclMap) -> IO (Int, Int,Int)
+outputDeclMap (pkg, mp) = do
+  let (both, onlyA, onlyM) = splitDeclMap mp
+      numBoth = Map.size both
+      numA = Map.size onlyA
+      numM = Map.size onlyM
+  writePackageToFile (pkg,both) "hasBoth.txt"
+  writePackageToFile (pkg, onlyA) "hasApp.txt"
+  writePackageToFile (pkg, onlyM) "hasMon.txt"
+  return (numBoth,numA, numM)
+
+writePackageToFile :: (FilePath,DeclMap) -> FilePath -> IO ()
+writePackageToFile pkg fp = if Map.null (snd pkg)
+                            then return ()
+                            else appendFile fp (declMpStr pkg)
+  
 
 packMap :: Anns -> [(GHC.OccName,InstFlag,GHC.LHsDecl GHC.RdrName)] -> DeclMap
 packMap anns = comp Map.empty

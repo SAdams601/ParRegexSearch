@@ -17,9 +17,8 @@ import ExactPrintSearch
 main :: IO ()
 main = do
   (fp:_) <- getArgs
-  t0 <- getCurrentTime
   res <- exactPrintSearch fp
-  mapM_ showDeclMp res
+  exactPrintReport res
 {-  packageContents <- readAllPackages fp
   putStrLn "Done reading packages"
   t1 <- getCurrentTime
@@ -29,11 +28,14 @@ main = do
   showTypeSums res
   outputResults res
   t3 <- getCurrentTime
-  --Line taken from: https://github.com/simonmar/parconc-examples/blob/master/kmeans/kmeans.hs#L70
-  printf "Total time on IO: %.2f\n" (realToFrac (diffUTCTime t1 t0) :: Double)
-  printf "Total time on search: %.2f\n" (realToFrac (diffUTCTime t2 t1) :: Double)
-  printf "Total time on print: %.2f\n" (realToFrac (diffUTCTime t3 t2) :: Double)
+  printTime t0 t1
+  printTime t1 t2
+  printTime t2 t3
 -}
+
+printTime :: String -> UTCTime -> UTCTime -> IO ()
+--Line taken from: https://github.com/simonmar/parconc-examples/blob/master/kmeans/kmeans.hs#L70
+printTime str t1 t2 = printf ("Total time on " ++ str ++ ": %.2f\n") (realToFrac (diffUTCTime t2 t1) :: Double)
 
 type DirContents = (FilePath,[(FilePath, B.ByteString)])
 type SearchRes = (FilePath,[(FilePath, [Match])])
@@ -89,10 +91,28 @@ regex = B.pack $ "instance Monad"
 
 exactPrintSearch :: FilePath -> IO [(FilePath,DeclMap)]
 exactPrintSearch fp = do
+  t0 <- getCurrentTime
   files <- getAllFileNames fp
---  print files
-  maps <- mapM (\(pName, fs) -> do{mp <- searchPackage fs; return (pName, mp)}) files
+  t1 <- getCurrentTime
+  maps <- sequence (parMap rseq (\(pName, fs) -> do{putStrLn $ "Searching: " ++ pName;
+                                                    mp <- searchPackage fs;
+                                                    evaluate mp;
+                                                    return (pName, mp)}) files)
+  --mapM (\(pName, fs) -> do{mp <- searchPackage fs; evaluate mp $ return (pName, mp)}) files
+  t2 <- getCurrentTime
+  printTime "IO" t0 t1
+  printTime "search" t1 t2
   return maps
+
+exactPrintReport :: [(FilePath, DeclMap)] -> IO ()
+exactPrintReport pkgs = do
+  counts <- mapM outputDeclMap pkgs
+  let (bothC, aCount, mCount) = foldl addTriple (0,0,0) counts
+  putStrLn $ "Number of types implementing both: " ++ show bothC
+  putStrLn $ "Number of types implementing just applicative: " ++ show aCount
+  putStrLn $ "Number of types implementing just monad: " ++ show mCount
+  return ()
+        where addTriple (x1, y1, z1) (x2,y2,z2) = (x1+x2,y1+y2,z1+z2)
 
 findAppInstances :: [DirContents] -> [SearchRes]
 findAppInstances = parMap rseq fun
