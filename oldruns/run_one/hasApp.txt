@@ -1,0 +1,125 @@
+==========================
+Package: hackage/package/tasty-0.9.0.1
+[The type {OccName: f}
+Has an applicative instance:
+
+instance (Applicative f, Monoid a) => Monoid (Ap f a) where
+  mempty = pure mempty
+  mappend = liftA2 mappend
+Does not define a monad instance.
+]==========================
+Package: hackage/package/async-pool-0.9.0
+[The type {OccName: Concurrently}
+Has an applicative instance:
+
+
+instance Applicative Concurrently where
+  pure x = Concurrently $ \_ -> return x
+  Concurrently fs <*> Concurrently as =
+    Concurrently $ \tg -> (\(f, a) -> f a) <$> concurrently tg (fs tg) (as tg)
+Does not define a monad instance.
+]==========================
+Package: hackage/package/typed-spreadsheet-1.1.0
+[The type {OccName: Cell}
+Has an applicative instance:
+
+
+instance Applicative Cell where
+    pure a = Cell (pure (empty, pure a))
+
+    Cell mF <*> Cell mX = Cell (liftA2 helper mF mX)
+      where
+        helper (inputF, foldF) (inputX, foldX) = (input, fold )
+          where
+            input = fmap Left inputF <|> fmap Right inputX
+
+            fold = Fold.handles _Left foldF <*> Fold.handles _Right foldX
+Does not define a monad instance.
+,The type {OccName: Updatable}
+Has an applicative instance:
+
+
+instance Applicative Updatable where
+    pure a = Updatable (pure (pure a))
+
+    Updatable mf <*> Updatable mx = Updatable (liftA2 (<*>) mf mx)
+Does not define a monad instance.
+]==========================
+Package: hackage/package/unm-hip-0.3.1.6
+[The type {OccName: BoxedImage}
+Has an applicative instance:
+
+
+instance Applicative BoxedImage where
+  pure a = Image 1 1 (V.fromList [a])
+  (<*>) (Image rows cols partial) (Image rows' cols' toApply)
+    | rows /= rows' && cols /= cols' = error "Cannot apply images of unequal dimensions."
+    | otherwise = Image rows cols (V.fromList applied) where
+       indices = [ r*cols + c | r <- [0..rows-1], c <- [0..cols-1]]
+       applied = map func indices
+       func i = (partial V.! i) (toApply V.! i)
+Does not define a monad instance.
+]==========================
+Package: hackage/package/list-tries-0.6.3
+[The type {OccName: Identity}
+Has an applicative instance:
+
+
+instance Applicative Identity where
+   pure = Id
+   Id f <*> Id a = Id (f a)
+Does not define a monad instance.
+]==========================
+Package: hackage/package/HaTeX-3.9.1.0
+[The type {OccName: f}
+Has an applicative instance:
+
+
+instance Applicative f => Applicative (LaTeXT f) where
+ pure = LaTeXT . pure . pairNoth
+ (LaTeXT f) <*> (LaTeXT x) = LaTeXT $ fmap (first . fst) f <*> x
+Does not define a monad instance.
+]==========================
+Package: hackage/package/NestedFunctor-0.2.0.2
+[The type {OccName: f}
+Has an applicative instance:
+
+
+instance (Applicative f, Alternative (Nested fs)) => Alternative (Nested (Nest fs f)) where
+   empty             = Nest empty
+   Nest x <|> Nest y = Nest (x <|> y)
+Does not define a monad instance.
+]==========================
+Package: hackage/package/WebCont-0.0.1
+[The type {OccName: Identity}
+Has an applicative instance:
+
+instance Applicative Identity where pure = return; (<*>) = ap;
+Does not define a monad instance.
+]==========================
+Package: hackage/package/pdfinfo-1.5.4
+[The type {OccName: ParsePDFInfo}
+Has an applicative instance:
+
+instance Applicative ParsePDFInfo where (<*>) = ap; pure = return
+Does not define a monad instance.
+]==========================
+Package: test/tasty-0.9.0.1
+[The type {OccName: f}
+Has an applicative instance:
+
+instance (Applicative f, Monoid a) => Monoid (Ap f a) where
+  mempty = pure mempty
+  mappend = liftA2 mappend
+Does not define a monad instance.
+]==========================
+Package: test/test-package
+[The type {OccName: ZipList}
+Has an applicative instance:
+
+
+instance App.Applicative ZipList where
+  pure x = ZipList (repeat x)
+  ZipList fs <*> ZipList xs = ZipList (zipWith id fs xs)
+Does not define a monad instance.
+]

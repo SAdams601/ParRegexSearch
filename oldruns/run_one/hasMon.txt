@@ -1,0 +1,716 @@
+==========================
+Package: hackage/package/york-lava-0.2
+[The type {OccName: JList}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad JList where
+  return a = One a
+  Zero >>= f = Zero
+  One a >>= f = f a
+  (as :+: bs) >>= f = (as >>= f) :+: (bs >>= f)
+]==========================
+Package: hackage/package/ircbot-0.6.5
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (BotMonad m, Monad m) => BotMonad (ParsecT s u m) where
+    askBotEnv        = lift askBotEnv
+    askMessage       = lift askMessage
+    askOutChan       = lift askOutChan
+    localMessage f m = mapParsecT (localMessage f) m
+    sendMessage      = lift . sendMessage
+    logM lvl msg     = lift (logM lvl msg)
+    whoami           = lift whoami
+]==========================
+Package: hackage/package/FileSystem-1.0.0
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (Functor m, Monad m) => FSMonad (FST m) where
+ getFS = WrapFST get
+ putFS = WrapFST . put
+]==========================
+Package: hackage/package/mtlparse-0.1.4.0
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => MonadState ( [a], [a] ) ( ParseT a m ) where
+  get     = ParseT $ \inp -> return [ (inp, inp) ]
+  put inp = ParseT $ \_   -> return [ ((), inp) ]
+]==========================
+Package: hackage/package/caledon-3.2.2.0
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+-- why doesn't this exist in the standard library?
+instance (Monad m, Alternative m) => Alternative (ContT a m) where
+  empty = lift $ empty
+  c1 <|> c2 = ContT $ \cont -> m1f cont <|> m2f cont
+    where m1f = runContT c1
+          m2f = runContT c2
+]==========================
+Package: hackage/package/mzv-0.1.0.2
+[The type {OccName: Identity}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad Identity where
+    return a = Identity a
+    m >>= k  = k (runIdentity m)
+,The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (Monad m) => MonadCont (ContT r m) where
+    callCC f = ContT $ \c -> runContT (f (\a -> ContT $ \_ -> c a)) c
+,The type {OccName: n}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (LWith list n ((:>) t t' m), Monad n, Monad m, MonadTrans t, MonadTrans t') => LWith1 list HFalse n (Tagged e (t (t' m))) where
+  lstructure1 list _ = case (mt :: Transformation t' m) of
+                        MT -> case (mt :: Transformation t (t' m)) of
+                                MT -> t `hcomp` o `hcomp` lstructure list
+]==========================
+Package: hackage/package/DSTM-0.1.2
+[The type {OccName: STM}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad STM where
+  -- (>>=) :: STM a -> (a -> STM b) -> STM b
+  (STM tr1)  >>= k = STM (\state -> do
+                          stmRes <- tr1 state
+                          case stmRes of
+                            Success newState v ->
+                               let (STM tr2) = k v in
+                                 tr2 newState
+                            Retry newState -> return (Retry newState)
+                            Exception newState e -> return (Exception newState e)
+                       )
+  -- return :: a -> STM a
+  return x      = STM (\state -> return (Success state x))
+]==========================
+Package: hackage/package/imm-1.0.1.0
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => PairingM (CoDatabaseF t m) (DatabaseF t) m where
+  -- pairM :: (a -> b -> m r) -> f a -> g b -> m r
+  pairM p (CoDatabaseF fl _ _ _ _ _ _) (FetchList _ key next) = do
+    (result, a) <- fl key
+    p a $ next result
+  pairM p (CoDatabaseF _ fa _ _ _ _ _) (FetchAll _ next) = do
+    (result, a) <- fa
+    p a $ next result
+  pairM p (CoDatabaseF _ _ u _ _ _ _) (Update _ key f next) = do
+    (result, a) <- u key f
+    p a $ next result
+  pairM p (CoDatabaseF _ _ _ i _ _ _) (InsertList _ rows next) = do
+    (result, a) <- i rows
+    p a $ next result
+  pairM p (CoDatabaseF _ _ _ _ d _ _) (DeleteList _ k next) = do
+    (result, a) <- d k
+    p a $ next result
+  pairM p (CoDatabaseF _ _ _ _ _ p' _) (Purge _ next) = do
+    (result, a) <- p'
+    p a $ next result
+  pairM p (CoDatabaseF _ _ _ _ _ _ c) (Commit _ next) = do
+    (result, a) <- c
+    p a $ next result
+]==========================
+Package: hackage/package/STMonadTrans-0.3.3
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (Monad m, Functor m) => Applicative (STT s m) where
+  pure a = STT $ \s# -> return (STTRet s# a)
+  (STT m) <*> (STT n) = STT $ \s1 ->
+                        do (STTRet s2 f) <- m s1
+                           (STTRet s3 x) <- n s2
+                           return (STTRet s3 (f x))
+]==========================
+Package: hackage/package/Cabal-1.8.0.6
+[The type {OccName: ParseResult}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad ParseResult where
+        return x = ParseOk [] x
+        ParseFailed err >>= _ = ParseFailed err
+        ParseOk ws x >>= f = case f x of
+                               ParseFailed err -> ParseFailed err
+                               ParseOk ws' x' -> ParseOk (ws'++ws) x'
+        fail s = ParseFailed (FromString s Nothing)
+,The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => Monad (StT s m) where
+    return a = StT (\s -> return (a,s))
+    StT f >>= g = StT $ \s -> do
+                        (a,s') <- f s
+                        runStT (g a) s'
+]==========================
+Package: hackage/package/mmtl-0.1
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+-- ---------------------------------------------------------------------------
+-- Instances for other mtl transformers
+
+instance (Monad m, MonadTrans t, Monad (t (ListT m))) =>
+         MonadPlus (t (ListT m)) where
+    mzero = lift $ ListT $ return []
+    mplus m n = join $ lift $ ListT $ return [m,n]
+]==========================
+Package: hackage/package/error-message-1.1
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+-- @-node:gcross.20091202203048.1609:Applicative (Either e a)
+-- @+node:gcross.20091202203048.1610:Applicative (ErrorT e m a)
+instance (Monoid e, Error e, Monad m) => Applicative (ErrorT e m) where
+    pure = return
+    e_fn <*> e_arg = ErrorT $ liftM2 (<*>) (runErrorT e_fn) (runErrorT e_arg)
+]==========================
+Package: hackage/package/dejafu-0.3.2.1
+[The type {OccName: n}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad n => C.MonadSTM (STMLike n r) where
+  type TVar (STMLike n r) = TVar r
+
+  retry = toSTM (const SRetry)
+
+  orElse (S a) (S b) = toSTM (SOrElse a b)
+
+  newTVarN n = toSTM . SNew n
+
+  readTVar = toSTM . SRead
+
+  writeTVar tvar a = toSTM (\c -> SWrite tvar a (c ()))
+]==========================
+Package: hackage/package/minioperational-0.4.9
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (Monad m, Tower m) => Tower (ReifiedProgramT t m) where
+    type Floors (ReifiedProgramT t m) = t
+      ': ProgramT t m
+      ': P.Program t
+      ': P.ReifiedProgram t
+      ': Floors1 m
+    stairs = (:>>= Return)
+      `rung` (\(ProgramT m) -> m Return (flip Lift id) (:>>=))
+      `rung` (\(P.Program m) -> m Return (:>>=))
+      `rung` (\(P.Program m) -> m Return (:>>=)) . P.fromReified
+      `rung` liftGondolas
+]==========================
+Package: hackage/package/exp-pairs-0.1.5.1
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => Serial m Path where
+  series = foldMap (\x -> if x then aPath else baPath) <$> (series :: Monad m => Series m [Bool])
+]==========================
+Package: hackage/package/logger-0.1.0.2
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (Monad m, Functor m) => MonadLoggerHandler (HandlerLoggerT m) (HandlerLoggerT m) where
+    addHandler h = do
+        topH <- getTopHandler
+        putTopHandler $ addChildHandler h topH
+]==========================
+Package: hackage/package/feldspar-language-0.7
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (AlphaEq dom dom dom env, Monad m) =>
+    AlphaEq (LoopM m) (LoopM m) dom env
+  where
+    alphaEqSym = alphaEqSymDefault
+]==========================
+Package: hackage/package/skulk-0.1.3.0
+[The type {OccName: a}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+#if __GLASGOW_HASKELL__ < 710
+instance (Applicative a, Monad a, Monad b, Traversable b) => Monad (Deep a b) where
+#else
+instance (Monad a, Monad b, Traversable b) => Monad (Deep a b) where
+#endif
+    return = Deep . return . return
+    fail = Deep . return . fail
+    (Deep abx) >>= f = Deep $ do
+        bx <- abx
+        let baby = expose . f <$> bx
+        let abby = sequenceA baby
+        let aby = join <$> abby
+        aby
+]==========================
+Package: hackage/package/bindings-bfd-1.2.0.0
+[The type {OccName: HappyIdentity}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad HappyIdentity where
+    return = HappyIdentity
+    (HappyIdentity p) >>= q = q p
+]==========================
+Package: hackage/package/cao-0.1.1
+[The type {OccName: CaoResult}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad CaoResult  where
+    return !x = CaoResult $! \ st -> return (Right (x, mempty), st)
+    (>>=)     = bindTcMonad
+]==========================
+Package: hackage/package/data-layer-1.0.4
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+instance {-# OVERLAPPABLE #-} (Monad m, LayeredM m l, ImmersedM (Unlayered l) m a) => ImmersedM l m a where viewImmersedM = viewLayeredM >=> viewImmersedM
+]==========================
+Package: hackage/package/pipes-core-0.1.0
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => Multiplicative (PipeC m r) Either where
+  unit = arr absurd
+  mult = PipeC joinP
+]==========================
+Package: hackage/package/monad-task-0.1.0
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (Monoid w, Monad m, MonadTask a m) => MonadTask a (StrictWriter.WriterT w m) where
+  exit   = lift exit
+  yield  = lift yield
+  fork   = lift . fork . StrictWriter.runWriterT
+  watch  = lift . watch
+  signal = lift . signal
+]==========================
+Package: hackage/package/twilio-0.1.3.1
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => MonadRequest (RequestT m) where
+  request go r = RequestT . FreeT . return . Free $ RequestF (r, runRequestT . go)
+]==========================
+Package: hackage/package/haskoon-httpspec-0.5.0.1
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => MonadError WebExc (ReqHandlerT m) where
+    throwError err = ReqHandlerT (throwError err)
+    catchError (ReqHandlerT action') handler =
+        ReqHandlerT (catchError action' handler')
+        where handler' err = let ReqHandlerT result  = handler err in result
+]==========================
+Package: hackage/package/transactional-events-0.1.0.0
+[The type {OccName: CHS}
+Does not define a applicative instance.
+Has a monad instance:
+ -- blocks until var is written
+
+instance Monad CHS where
+    return = CHS . return
+    fail _ = CHS (prompt Fail)
+    m >>= f = CHS $ runCHS m >>= runCHS . f
+]==========================
+Package: hackage/package/snaplet-wordpress-0.1.1.2
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+-- NOTE(dbp 2014-11-07): We define equality that is 'good enough' for testing.
+-- In truth, our definition is wrong because of the functions inside of 'P' variants.
+instance (Functor m, Monad m) =>  Eq (Field m) where
+  F t1 == F t2 = t1 == t2
+  P t1 _ == P t2 _ = t1 == t2
+  N t1 n1 == N t2 n2 = t1 == t2 && n1 == n2
+  M t1 m1 == M t2 m2 = t1 == t2 && m1 == m2
+]==========================
+Package: hackage/package/Coadjute-0.1.1
+[The type {OccName: Coadjute}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad Coadjute where
+   return        = Co . return
+   (Co rs) >>= f = Co (rs >>= unCo.f)
+]==========================
+Package: hackage/package/maude-0.6.1
+[The type {OccName: Parser}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad Parser where
+    return = Ok
+    ParseError e s >>= _ = ParseError e s
+    Ok r >>= k = k r
+]==========================
+Package: hackage/package/smallcheck-1.1.1
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+instance Monad m => CoSerial m Bool where
+  coseries rs =
+    rs >>- \r1 ->
+    rs >>- \r2 ->
+    return $ \x -> if x then r1 else r2
+]==========================
+Package: hackage/package/csound-expression-dynamic-0.1.6
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => Monad (DepT m) where
+    return = DepT . return
+    ma >>= mf = DepT $ unDepT ma >>= unDepT . mf
+]==========================
+Package: hackage/package/Monatron-0.3.1
+[The type {OccName: Id}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad Id where
+    return  = Id
+    fail    = error
+    m >>= f = f (runId m)
+,The type {OccName: Lift}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad Lift where
+  return x  = L x
+  fail x    = error x
+  L x >>= k = k x
+,The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => ListM (ListT m) where
+    listModel = modelListT
+]==========================
+Package: hackage/package/cpsa-3.3.2
+[The type {OccName: EitherS}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad EitherS where
+    return = RightS
+    LeftS l >>= _ = LeftS l
+    RightS r >>= k = k r
+    fail s = LeftS s
+,The type {OccName: ReturnFail}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad ReturnFail where
+    return = Return
+    Fail l >>= _ = Fail l
+    Return r >>= k = k r
+    fail s = Fail s
+]==========================
+Package: hackage/package/monad-state-0.2.0.3
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (Monad m) => MonadAbort (AbortT r m) where
+    type AbortResultType (AbortT r m) = r
+    abort = Abort.abort
+]==========================
+Package: hackage/package/HaTeX-3.9.1.0
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+-- | Undefined methods: 'asinh', 'atanh' and 'acosh'.
+--   This instance is defined in the "Text.LaTeX.Packages.AMSMath" module.
+instance Monad m => Floating (LaTeXT m a) where
+ pi = pi_
+ exp = liftFun exp
+ sqrt = liftFun sqrt
+ log = liftFun log
+ (**) = liftOp (**)
+ logBase = liftOp logBase
+ sin = liftFun sin
+ tan = liftFun tan
+ cos = liftFun cos
+ asin = liftFun asin
+ atan = liftFun atan
+ acos = liftFun acos
+ sinh = liftFun sinh
+ tanh = liftFun tanh
+ cosh = liftFun cosh
+ -- Non-defined methods
+ asinh = error "Function 'asinh' is not defined in AMSMath!"
+ atanh = error "Function 'atabh' is not defined in AMSMath!"
+ acosh = error "Function 'acosh' is not defined in AMSMath!"
+]==========================
+Package: hackage/package/xml-monad-0.5
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (Monad m, Error e) => MonadCompose (XmlT e s m) (XmlT e t m) s t where
+    mcompose m n = XmlT $ mcompose (fromXmlT m) (fromXmlT n)
+]==========================
+Package: hackage/package/ixmonad-0.57
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (P.Monad m) => Effect (Monad m) where
+    {-| Trivial singleton monoid -}
+    type Inv (Monad m) s t    = ()
+    type Unit (Monad m)       = ()
+    type Plus (Monad m) s t   = ()
+
+    return x = Wrap (P.return x)
+    (Wrap x) >>= f = Wrap ((P.>>=) x (unWrap . f))
+]==========================
+Package: hackage/package/effect-monad-0.6.1
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => Counting (StateT Int m) where
+    incC = do x <- get
+              put (x + 1)
+]==========================
+Package: hackage/package/Annotations-0.2.1
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+
+instance (Monad m, HFunctor fam (PF fam), EqS fam, Fam fam) => MonadYield (YieldT x fam m) where
+  type YieldFam (YieldT x fam m) = fam
+  type AnnType (YieldT x fam m) = x
+  yield = doYield
+]==========================
+Package: hackage/package/LogicGrowsOnTrees-1.1.0.2
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+-- }}}
+
+instance Monad m ⇒ Arbitrary (UniqueTreeT m) where -- {{{
+    arbitrary = (UniqueTree . ($ (const $ return ()))) <$> randomUniqueTreeWithHooks
+]==========================
+Package: hackage/package/hoauth-0.3.5
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (Monad m,Functor m) => Functor (OAuthMonadT m) where
+  fmap f (OAuthMonadT ma) = OAuthMonadT $ \t0 -> ma t0 >>= either left right
+    where left = return . Left
+          right (t1,a) = return (Right (t1, f a))
+]==========================
+Package: hackage/package/dbus-core-0.9.3
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => Monad (ErrorT e m) where
+        return = ErrorT . return . Right
+        (>>=) m k = ErrorT $ do
+                x <- runErrorT m
+                case x of
+                        Left l -> return $ Left l
+                        Right r -> runErrorT $ k r
+]==========================
+Package: hackage/package/nonempty-alternative-0.4.0
+[The type {OccName: f}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+----------------------------------------------------------------------
+
+instance (Alternative f, Monad f) => Monad (NonEmptyL f) where
+  (x :<: xs) >>= f = y :<: (ys <|> zs)
+                  where (y :<: ys) = f x
+                        zs = xs >>= flattenL . f
+]==========================
+Package: hackage/package/roundtrip-string-0.1.0.1
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (Monad m, Stream s m Char) => StringSyntax (PParser s u m) where
+    token f = Prim.tokenPrim showChar nextPos testChar
+        where
+          showChar x      = '\'' : x : ['\'']
+          testChar x      = if f x then Just x else Nothing
+          nextPos pos x _ = Pos.updatePosChar pos x
+]==========================
+Package: hackage/package/compression-0.1
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => MonadState s (LazyStateT s m) where
+    get = LazyStateT $ \s -> return (s, s)
+    put s = LazyStateT $ \_ -> return ((), s)
+]==========================
+Package: hackage/package/open-signals-0.1.0.3
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad m => MonadSignal sigs (SignalT sigs m) where
+    signalUnion = SignalT . pure . Signal
+]==========================
+Package: hackage/package/llvm-pretty-bc-parser-0.2.1.0
+[The type {OccName: Parse}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad Parse where
+  {-# INLINE return #-}
+  return  = Parse . return
+
+  {-# INLINE (>>=) #-}
+  Parse m >>= f = Parse (m >>= unParse . f)
+
+  {-# INLINE fail #-}
+  fail = failWithContext
+]==========================
+Package: hackage/package/scion-0.1.0.2
+[The type {OccName: Pa}
+Does not define a applicative instance.
+Has a monad instance:
+
+instance Monad Pa where
+  return x = Pa $ \_ -> Right x
+  m >>= k = Pa $ \req ->
+            case unPa m req of
+              Left err -> Left err
+              Right a -> unPa (k a) req
+  fail msg = Pa $ \_ -> Left msg
+]==========================
+Package: hackage/package/kontrakcja-templates-0.1
+[The type {OccName: m}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance (Functor m, Monad m) => TemplatesMonad (TemplatesT m) where
+  getTemplates = TemplatesT $ do
+    (column, ts) <- ask
+    return $ localizedVersion column ts
+  getTextTemplatesByColumn column = TemplatesT $ do
+    (_, ts) <- ask
+    return $ localizedVersion column ts
+]==========================
+Package: hackage/package/sifflet-lib-2.2.1
+[The type {OccName: EvalRes}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad EvalRes where
+  EvalOk value >>= f = f value
+  EvalError e >>= _f = EvalError e
+  EvalUntried >>= _f = EvalUntried
+  return = EvalOk
+  fail = EvalError
+,The type {OccName: SuccFail}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad SuccFail where
+  Succ val >>= f = f val
+  Fail err >>= _f = Fail err
+  return = Succ
+  fail = Fail
+]==========================
+Package: test/fst-0.9.0.1
+[The type {OccName: STM}
+Does not define a applicative instance.
+Has a monad instance:
+
+
+instance Monad STM where
+ return   x       = STM(\s -> (x,s))
+ (STM m) >>=  f   = STM(\s -> let (a,s1) = m s in
+                          unSTM (f a) s1)
+]

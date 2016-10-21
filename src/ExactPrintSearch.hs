@@ -25,18 +25,16 @@ catchAny = Control.Exception.catch
   
 searchFile :: DeclMap -> FilePath -> IO DeclMap
 searchFile map fp = do
-  putStrLn fp
   parse <- catchAny (parseModule fp) $ \e -> do
     appendFile "errors.txt" ("Fatal parse exception in " ++ fp)
     appendFile "errors.txt" ((show e) ++ "\n===================\n")
     return (Left (GHC.noSrcSpan , (show e)))
   case parse of
     Left (_,err) -> do
-      putStrLn "Parse error occured: "
+      putStrLn $ "Parse error occured in " ++ fp ++ "\n"
       putStrLn err
       return Map.empty
     Right (anns, ps) -> do
-      putStrLn "Right hand parse res"
       let mQual = checkForQualifiedMonad ps
           aQual = checkForQualifiedApplicative ps
           allInstances = findInstances (aQual,mQual) ps
@@ -164,11 +162,14 @@ findInstances (aQual,mQual) ps = SYB.everything (++) ([] `SYB.mkQ` comp) ps
     comp _ = []
     releventType :: GHC.HsType GHC.RdrName -> Maybe (GHC.OccName,InstFlag)
     releventType = SYB.something (Nothing `SYB.mkQ` releventType')
-    releventType' (GHC.HsAppTy (GHC.L _ (GHC.HsTyVar nm1)) (GHC.L _ (GHC.HsTyVar nm2)))
+    releventType' :: GHC.HsType GHC.RdrName -> Maybe (GHC.OccName,InstFlag)
+    releventType' (GHC.HsForAllTy _ _ _ _ ty) = SYB.something (Nothing `SYB.mkQ` releventType'') ty
+    releventType' _ = Nothing
+    releventType'' (GHC.HsAppTy (GHC.L _ (GHC.HsTyVar nm1)) (GHC.L _ (GHC.HsTyVar nm2)))
       | isMonTy nm1 = Just (GHC.rdrNameOcc nm2, Mnad)
       | isAppTy nm1 = Just (GHC.rdrNameOcc nm2, App)
       | otherwise = Nothing
-    releventType' _ = Nothing
+    releventType'' _ = Nothing
     isMonTy :: GHC.RdrName -> Bool
     isMonTy (GHC.Unqual occNm) = GHC.occNameString occNm == "Monad"
     isMonTy (GHC.Qual mNm occNm) = (GHC.occNameString occNm == "Monad") -- && (mNm `compMaybe` mQual)

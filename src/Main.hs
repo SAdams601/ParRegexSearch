@@ -102,6 +102,7 @@ exactPrintSearch fp = do
   t2 <- getCurrentTime
   printTime "IO" t0 t1
   printTime "search" t1 t2
+  putStrLn $ "Total number of packages searched: " ++ (show (length maps))
   return maps
 
 exactPrintReport :: [(FilePath, DeclMap)] -> IO ()
