@@ -40,6 +40,7 @@ executable ParRegexSearch
                      , ghc
                      , ghc-syb-utils
                      , hood
+                     , data-hash
   hs-source-dirs:      src
   ghc-options: -O2 -threaded -rtsopts -eventlog
   default-language:    Haskell2010

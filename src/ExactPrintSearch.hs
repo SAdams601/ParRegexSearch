@@ -6,7 +6,7 @@ import Language.Haskell.GHC.ExactPrint.Utils
 import Language.Haskell.GHC.ExactPrint.Transform
 import Language.Haskell.GHC.ExactPrint.Types
 import Language.Haskell.GHC.ExactPrint
-import Data.Map as Map
+import qualified Data.Map as Map
 import Data.Foldable
 import Data.Maybe
 import qualified GHC as GHC
@@ -16,6 +16,7 @@ import qualified GHC.SYB.Utils as SYB
 import qualified RdrName as GHC
 import System.IO.Unsafe
 import Control.Exception
+import Data.Hash
 
 searchPackage :: [FilePath] -> IO DeclMap
 searchPackage files = foldlM searchFile Map.empty files
@@ -39,6 +40,7 @@ searchFileWithParser parser  map fp = do
       appendFile "failedParses.txt" fp
       return Map.empty
     Right (anns, ps) -> do
+      putStrLn $ "Parsed: " ++ fp
       let mQual = checkForQualifiedMonad ps
           aQual = checkForQualifiedApplicative ps
           allInstances = findInstances (aQual,mQual) ps
@@ -46,7 +48,12 @@ searchFileWithParser parser  map fp = do
 
 newtype TypeKey = TK (GHC.HsType GHC.RdrName)
 
-deriving instance Ord TypeKey
+instance Hashable TypeKey where
+  hash (TK ty) = hshTy ty
+    where hshTy ty = (hash (show $ SYB.toConstr ty)) `combine` (foldl combine (hashInt 0) (SYB.gmapQ ((hashInt 0) `SYB.mkQ` hshTy) ty))
+
+instance Ord TypeKey where
+  t1 <= t2 = hash t1 <= hash t2
 
 instance Eq TypeKey where
   (TK ty1) == (TK ty2) = compareTypes ty1 ty2
