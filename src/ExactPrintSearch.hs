@@ -1,4 +1,4 @@
-{-#LANGUAGE ScopedTypeVariables, DeriveDataTypeable, DeriveGeneric #-}
+{-#LANGUAGE ScopedTypeVariables, DeriveDataTypeable, DeriveGeneric, RankNTypes, StandaloneDeriving #-}
 module ExactPrintSearch where
 import FindTypes hiding (searchFile, findInstances)
 import Language.Haskell.GHC.ExactPrint.Parsers
@@ -24,15 +24,19 @@ catchAny :: IO a -> (SomeException -> IO a) -> IO a
 catchAny = Control.Exception.catch
   
 searchFile :: DeclMap -> FilePath -> IO DeclMap
-searchFile map fp = do
-  parse <- catchAny (parseModule fp) $ \e -> do
-    appendFile "errors.txt" ("Fatal parse exception in " ++ fp)
-    appendFile "errors.txt" ((show e) ++ "\n===================\n")
+searchFile = searchFileWithParser parseModule
+type ExactParser = (FilePath -> IO (Either (GHC.SrcSpan, String) (Anns, GHC.ParsedSource)))
+
+searchFileWithParser :: ExactParser -> DeclMap -> FilePath -> IO DeclMap
+searchFileWithParser parser  map fp = do
+  parse <- catchAny (parser fp) $ \e -> do
     return (Left (GHC.noSrcSpan , (show e)))
   case parse of
     Left (_,err) -> do
       putStrLn $ "Parse error occured in " ++ fp ++ "\n"
-      putStrLn err
+      appendFile "errors.txt" ("Fatal parse exception in " ++ fp)
+      appendFile "errors.txt" (err ++ "\n===================\n")
+      appendFile "failedParses.txt" fp
       return Map.empty
     Right (anns, ps) -> do
       let mQual = checkForQualifiedMonad ps
@@ -40,15 +44,20 @@ searchFile map fp = do
           allInstances = findInstances (aQual,mQual) ps
       return $ Map.union map (packMap anns allInstances)
 
+newtype TypeKey = TK (GHC.HsType GHC.RdrName)
 
+deriving instance Ord TypeKey
 
-type DeclMap = Map.Map GHC.OccName DeclSum
+instance Eq TypeKey where
+  (TK ty1) == (TK ty2) = compareTypes ty1 ty2
 
-data DeclSum = D {name :: GHC.OccName
-                , hasM :: Bool
-                , hasA :: Bool
-                , mDecl :: Maybe (Anns,(GHC.LHsDecl GHC.RdrName))
-                , aDecl :: Maybe (Anns,(GHC.LHsDecl GHC.RdrName))}
+type DeclMap = Map.Map TypeKey DeclSum
+
+data DeclSum = D { name :: String
+                 , hasM :: Bool
+                 , hasA :: Bool
+                 , mDecl :: Maybe (Anns,(GHC.LHsDecl GHC.RdrName))
+                 , aDecl :: Maybe (Anns,(GHC.LHsDecl GHC.RdrName))}
 
 instance Show DeclSum where
   show ds = let ln1 = "The type " ++ showData (name ds) ++ "\n" in
@@ -104,16 +113,19 @@ writePackageToFile pkg fp = if Map.null (snd pkg)
                             else appendFile fp (declMpStr pkg)
   
 
-packMap :: Anns -> [(GHC.OccName,InstFlag,GHC.LHsDecl GHC.RdrName)] -> DeclMap
+packMap :: Anns -> [(GHC.LHsType GHC.RdrName,InstFlag,GHC.LHsDecl GHC.RdrName)] -> DeclMap
 packMap anns = comp Map.empty
   where comp mp [] = mp
-        comp mp ((tyName, flg, decl): rst) = let newMap = insertIntoDeclMap tyName flg decl mp in
+        comp mp ((ty, flg, decl): rst) = let
+          tyName = exactPrint ty anns
+          newMap = insertIntoDeclMap tyName ty flg decl mp in
           comp newMap rst
-        insertIntoDeclMap nm flg decl mp = let mSum = Map.lookup nm mp
-                                               newSum = mkNewSum nm flg decl in
-                                           case mSum of
-                                             Nothing -> Map.insert nm newSum mp
-                                             (Just sm) -> Map.adjust (updateSum flg decl) nm mp 
+        insertIntoDeclMap nm ty flg decl mp = let tyKey = TK $ GHC.unLoc ty
+                                                  mSum = Map.lookup tyKey mp
+                                                  newSum = mkNewSum nm flg decl in
+                                                case mSum of
+                                                  Nothing -> Map.insert tyKey newSum mp
+                                                  (Just sm) -> Map.adjust (updateSum flg decl) tyKey mp 
         mkNewSum nm flg decl = let as = getAllAnns anns decl in
           case flg of
             Mnad -> D nm True False (Just (as,decl)) Nothing
@@ -149,10 +161,10 @@ data InstFlag = Mnad
 
 --This goes through a module and pulls out all monad and applicative instance declarations.
 --The first argument is a tuple with the ModuleName qualifiers for Control.Applicative and Control.Monad respectively
-findInstances :: (Maybe GHC.ModuleName,Maybe GHC.ModuleName) -> GHC.ParsedSource -> [(GHC.OccName,InstFlag,GHC.LHsDecl GHC.RdrName)]
+findInstances :: (Maybe GHC.ModuleName,Maybe GHC.ModuleName) -> GHC.ParsedSource -> [(GHC.LHsType GHC.RdrName,InstFlag,GHC.LHsDecl GHC.RdrName)]
 findInstances (aQual,mQual) ps = SYB.everything (++) ([] `SYB.mkQ` comp) ps
   where
-    comp :: GHC.LHsDecl GHC.RdrName -> [(GHC.OccName,InstFlag,GHC.LHsDecl GHC.RdrName)]
+    comp :: GHC.LHsDecl GHC.RdrName -> [(GHC.LHsType GHC.RdrName,InstFlag,GHC.LHsDecl GHC.RdrName)]
     comp c@(GHC.L _ (GHC.InstD (GHC.ClsInstD cDecl))) = 
       let (GHC.L _ declTy) = GHC.cid_poly_ty cDecl
           isRelevant = releventType declTy in
@@ -160,16 +172,13 @@ findInstances (aQual,mQual) ps = SYB.everything (++) ([] `SYB.mkQ` comp) ps
         Nothing -> []
         Just (oNm, flg) -> [(oNm,flg, c)]
     comp _ = []
-    releventType :: GHC.HsType GHC.RdrName -> Maybe (GHC.OccName,InstFlag)
+    releventType :: GHC.HsType GHC.RdrName -> Maybe (GHC.LHsType GHC.RdrName,InstFlag)
     releventType = SYB.something (Nothing `SYB.mkQ` releventType')
-    releventType' :: GHC.HsType GHC.RdrName -> Maybe (GHC.OccName,InstFlag)
-    releventType' (GHC.HsForAllTy _ _ _ _ ty) = SYB.something (Nothing `SYB.mkQ` releventType'') ty
+    releventType' :: GHC.HsType GHC.RdrName -> Maybe (GHC.LHsType GHC.RdrName,InstFlag)
+    releventType' (GHC.HsForAllTy _ _ _ _ (GHC.L _ (GHC.HsAppTy (GHC.L _ (GHC.HsTyVar nm1)) ty2)))
+      | isMonTy nm1 = Just (ty2, Mnad)
+      | isAppTy nm1 = Just (ty2, App)
     releventType' _ = Nothing
-    releventType'' (GHC.HsAppTy (GHC.L _ (GHC.HsTyVar nm1)) (GHC.L _ (GHC.HsTyVar nm2)))
-      | isMonTy nm1 = Just (GHC.rdrNameOcc nm2, Mnad)
-      | isAppTy nm1 = Just (GHC.rdrNameOcc nm2, App)
-      | otherwise = Nothing
-    releventType'' _ = Nothing
     isMonTy :: GHC.RdrName -> Bool
     isMonTy (GHC.Unqual occNm) = GHC.occNameString occNm == "Monad"
     isMonTy (GHC.Qual mNm occNm) = (GHC.occNameString occNm == "Monad") -- && (mNm `compMaybe` mQual)
@@ -184,6 +193,26 @@ compMaybe :: Eq a => a -> Maybe a -> Bool
 compMaybe a (Just b) = a == b
 compMaybe _ Nothing = False
 
+{- compareTypes :: GHC.HsType GHC.RdrName -> GHC.HsType GHC.RdrName -> Bool
+compareTypes (GHC.HsTyVar nm1) (GHC.HsTyVar nm2) = compareRdrName nm1 nm2
+compareTypes ty1 ty2 = (SYB.toConstr ty1 == SYB.toConstr ty2) && (snd (SYB.gmapAccumQl (&&) True compareTypes ty1 ty2))
+-}
+
+compareTypes :: GHC.HsType GHC.RdrName -> GHC.HsType GHC.RdrName -> Bool
+compareTypes = mkQQ False compareTypes'
+ where
+   compareTypes' :: GHC.HsType GHC.RdrName -> GHC.HsType GHC.RdrName -> Bool
+   compareTypes' (GHC.HsTyVar nm1) (GHC.HsTyVar nm2) = compareRdrName nm1 nm2
+   compareTypes' ty1 ty2 = SYB.toConstr ty1 == SYB.toConstr ty2
+   compareRdrName (GHC.Unqual occNm1) (GHC.Unqual occNm2) = swl (GHC.occNameString occNm1) (GHC.occNameString occNm2)
+   compareRdrName _ _ = False
+   swl str1 str2 = ((head str1) `elem` ['a'..'z']) && ((head str2) `elem` ['a'..'z'])
+
+mkQQ :: (SYB.Typeable a, SYB.Typeable b1, SYB.Typeable b2) => r -> (a -> a -> r) -> b1 -> b2 -> r
+mkQQ r f x y =
+  case (SYB.cast x, SYB.cast y) of
+    (Just (x' ::a), Just (y' :: a)) -> (f x' y')
+    _                               -> r
 
 --This is stolen from some of my own code:
 --https://github.com/SAdams601/HaRe/blob/gen-applicative/src/Language/Haskell/Refact/Utils/ExactPrint.hs#L231f

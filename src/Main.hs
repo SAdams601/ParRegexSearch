@@ -13,6 +13,7 @@ import qualified Data.Map as Map
 import Control.DeepSeq
 import System.IO
 import ExactPrintSearch
+import System.Mem
 
 main :: IO ()
 main = do
@@ -96,7 +97,8 @@ exactPrintSearch fp = do
   t1 <- getCurrentTime
   maps <- sequence (parMap rseq (\(pName, fs) -> do{putStrLn $ "Searching: " ++ pName;
                                                     mp <- searchPackage fs;
-                                                    evaluate mp;
+                                                    outputDeclMap (pName,mp);
+                                                    performGC;
                                                     return (pName, mp)}) files)
   --mapM (\(pName, fs) -> do{mp <- searchPackage fs; evaluate mp $ return (pName, mp)}) files
   t2 <- getCurrentTime
