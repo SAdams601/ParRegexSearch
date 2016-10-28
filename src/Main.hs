@@ -90,16 +90,16 @@ showSearchResStats srs = do
 
 regex = B.pack $ "instance Monad"
 
-exactPrintSearch :: FilePath -> IO [(FilePath,DeclMap)]
+exactPrintSearch :: FilePath -> IO [(FilePath,DeclMap,(Int, Int,Int))]
 exactPrintSearch fp = do
   t0 <- getCurrentTime
   files <- getAllFileNames fp
   t1 <- getCurrentTime
   maps <- sequence (parMap rseq (\(pName, fs) -> do{putStrLn $ "Searching: " ++ pName;
                                                     mp <- searchPackage fs;
-                                                    outputDeclMap (pName,mp);
+                                                    count <- outputDeclMap (pName,mp);
                                                     performGC;
-                                                    return (pName, mp)}) files)
+                                                    return (pName, mp,count)}) files)
   --mapM (\(pName, fs) -> do{mp <- searchPackage fs; evaluate mp $ return (pName, mp)}) files
   t2 <- getCurrentTime
   printTime "IO" t0 t1
@@ -107,10 +107,11 @@ exactPrintSearch fp = do
   putStrLn $ "Total number of packages searched: " ++ (show (length maps))
   return maps
 
-exactPrintReport :: [(FilePath, DeclMap)] -> IO ()
+exactPrintReport :: [(FilePath, DeclMap, (Int, Int,Int))] -> IO ()
 exactPrintReport pkgs = do
-  counts <- mapM outputDeclMap pkgs
-  let (bothC, aCount, mCount) = foldl addTriple (0,0,0) counts
+  let
+    counts = map (\(_,_,c) -> c) pkgs
+    (bothC, aCount, mCount) = foldl addTriple (0,0,0) counts
   putStrLn $ "Number of types implementing both: " ++ show bothC
   putStrLn $ "Number of types implementing just applicative: " ++ show aCount
   putStrLn $ "Number of types implementing just monad: " ++ show mCount
