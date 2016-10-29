@@ -18,8 +18,9 @@ import System.Mem
 main :: IO ()
 main = do
   (fp:_) <- getArgs
-  res <- exactPrintSearch fp
-  exactPrintReport res
+  exactPrintSearch fp
+  return ()
+--  exactPrintReport res
 {-  packageContents <- readAllPackages fp
   putStrLn "Done reading packages"
   t1 <- getCurrentTime

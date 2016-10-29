@@ -8,6 +8,7 @@ import Data.ByteString.Char8 (pack)
 import System.FilePath.Windows
 import qualified Data.ByteString as B
 import System.IO.Unsafe
+import Data.String.Utils
 import Control.Exception
 
 type FileMatches = (FilePath ,[String])
@@ -55,7 +56,9 @@ getDirContentsByPred dir pred = do
           r dir fp = do
             status <- getFileStatus $ pack fp
             if isDirectory status
-              then getDirContentsByPred fp pred
+              then if fp `endswith` "dist"
+                   then return []
+                   else getDirContentsByPred fp pred
               else do
               b <- pred fp
               if b

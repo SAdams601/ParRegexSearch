@@ -15,6 +15,7 @@ import qualified Data.Generics as SYB
 import qualified GHC.SYB.Utils as SYB
 import qualified RdrName as GHC
 import System.IO.Unsafe
+import System.IO
 import Control.Exception
 import Data.Hash
 
@@ -43,7 +44,12 @@ searchFileWithParser parser  map fp = do
       let mQual = checkForQualifiedMonad ps
           aQual = checkForQualifiedApplicative ps
           allInstances = findInstances (aQual,mQual) ps
-      return $ Map.union map (packMap anns allInstances)
+      if null allInstances
+        then return ()
+        else do
+          appendFile "output.txt" $ "Results from: " ++ fp ++ "\n"
+          mapM_ (writeAll anns) allInstances
+      return $ Map.empty --Map.union map (packMap anns allInstances)
 {-
 newtype TypeKey = TK (GHC.HsType GHC.RdrName)
 
@@ -57,6 +63,16 @@ instance Ord TypeKey where
 instance Eq TypeKey where
   (TK ty1) == (TK ty2) = compareTypes ty1 ty2
 -}
+
+writeAll :: Anns -> (GHC.HsType GHC.RdrName,InstFlag,GHC.LHsDecl GHC.RdrName) -> IO ()
+writeAll anns (_, flg, decl) = do
+  let as = getAllAnns anns decl
+      ln1 = case flg of
+        Mnad -> "Monad instance: \n"
+        App -> "Applicative instance: \n"
+      expPr = exactPrint decl as
+  appendFile "output.txt" (ln1 ++ expPr ++ "\n")
+  
 type DeclMap = Map.Map GHC.RdrName DeclSum
 
 data DeclSum = D { name :: String
@@ -119,10 +135,10 @@ writePackageToFile pkg fp = if Map.null (snd pkg)
                             else appendFile fp (declMpStr pkg)
   
 
-packMap :: Anns -> [(GHC.RdrName,InstFlag,GHC.LHsDecl GHC.RdrName)] -> DeclMap
+{-packMap :: Anns -> [(GHC.HsType GHC.RdrName,InstFlag,GHC.LHsDecl GHC.RdrName)] -> DeclMap
 packMap anns = comp Map.empty
   where comp mp [] = mp
-        comp mp ((rdrNm, flg, decl): rst) = let
+        comp mp ((ty, flg, decl): rst) = let
           tyName = (GHC.occNameString . GHC.rdrNameOcc) rdrNm
           newMap = insertIntoDeclMap rdrNm tyName flg decl mp in
           comp newMap rst
@@ -140,7 +156,7 @@ packMap anns = comp Map.empty
           case flg of
             Mnad -> sum {hasM = True, mDecl = Just (as,decl)}
             App -> sum {hasA = True, aDecl = Just (as,decl)}
-
+-}
 --This will get the occ name that applicative is known as in the module being processed
 checkForQualifiedApplicative :: GHC.ParsedSource -> Maybe GHC.ModuleName
 checkForQualifiedApplicative ps = SYB.something (Nothing `SYB.mkQ` comp) ps
@@ -167,10 +183,10 @@ data InstFlag = Mnad
 
 --This goes through a module and pulls out all monad and applicative instance declarations.
 --The first argument is a tuple with the ModuleName qualifiers for Control.Applicative and Control.Monad respectively
-findInstances :: (Maybe GHC.ModuleName,Maybe GHC.ModuleName) -> GHC.ParsedSource -> [(GHC.RdrName,InstFlag,GHC.LHsDecl GHC.RdrName)]
+findInstances :: (Maybe GHC.ModuleName,Maybe GHC.ModuleName) -> GHC.ParsedSource -> [(GHC.HsType GHC.RdrName,InstFlag,GHC.LHsDecl GHC.RdrName)]
 findInstances (aQual,mQual) ps = SYB.everything (++) ([] `SYB.mkQ` comp) ps
   where
-    comp :: GHC.LHsDecl GHC.RdrName -> [(GHC.RdrName,InstFlag,GHC.LHsDecl GHC.RdrName)]
+    comp :: GHC.LHsDecl GHC.RdrName -> [(GHC.HsType GHC.RdrName,InstFlag,GHC.LHsDecl GHC.RdrName)]
     comp c@(GHC.L _ (GHC.InstD (GHC.ClsInstD cDecl))) = 
       let (GHC.L _ declTy) = GHC.cid_poly_ty cDecl
           isRelevant = releventType declTy in
@@ -178,19 +194,19 @@ findInstances (aQual,mQual) ps = SYB.everything (++) ([] `SYB.mkQ` comp) ps
         Nothing -> []
         Just (oNm, flg) -> [(oNm,flg, c)]
     comp _ = []
-    releventType :: GHC.HsType GHC.RdrName -> Maybe (GHC.RdrName,InstFlag)
+    releventType :: GHC.HsType GHC.RdrName -> Maybe (GHC.HsType GHC.RdrName,InstFlag)
     releventType = SYB.something (Nothing `SYB.mkQ` releventType')
-    releventType' :: GHC.HsType GHC.RdrName -> Maybe (GHC.RdrName,InstFlag)
+    releventType' :: GHC.HsType GHC.RdrName -> Maybe (GHC.HsType GHC.RdrName,InstFlag)
     releventType' (GHC.HsForAllTy _ _ _ _ (GHC.L _ (GHC.HsAppTy (GHC.L _ (GHC.HsTyVar nm1)) ty2)))
         | isMonTy nm1 = Just (tyNm, Mnad)
         | isAppTy nm1 = Just (tyNm, App)
           where tyNm = extractTypeName ty2
     releventType' _ = Nothing
-    extractTypeName :: GHC.LHsType GHC.RdrName -> GHC.RdrName
+    extractTypeName :: GHC.LHsType GHC.RdrName -> GHC.HsType GHC.RdrName
     extractTypeName ty = case (GHC.unLoc ty) of
-      (GHC.HsTyVar nm) -> nm
+      t@(GHC.HsTyVar nm) -> t
       (GHC.HsParTy ty2) -> extractTypeName ty2
-      (GHC.HsAppTy ty2 _) -> extractTypeName ty2
+      (GHC.HsAppTy ty2 _) -> GHC.unLoc ty2
       _ -> unsafePerformIO (do {putStrLn "extract type failed: \n";
                               print $ SYB.showData SYB.Parser 3 ty;
                               return undefined})
