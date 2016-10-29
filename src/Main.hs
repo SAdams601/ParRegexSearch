@@ -14,6 +14,7 @@ import Control.DeepSeq
 import System.IO
 import ExactPrintSearch
 import System.Mem
+import SearchOutputFile
 
 main :: IO ()
 main = do
@@ -96,17 +97,24 @@ exactPrintSearch fp = do
   t0 <- getCurrentTime
   files <- getAllFileNames fp
   t1 <- getCurrentTime
+  filtered <- finishedPackages files
   maps <- sequence (parMap rseq (\(pName, fs) -> do{putStrLn $ "Searching: " ++ pName;
                                                     mp <- searchPackage fs;
                                                     count <- outputDeclMap (pName,mp);
+                                                    appendFile "finishedPackages.txt" $ pName ++ "\n";
                                                     performGC;
-                                                    return (pName, mp,count)}) files)
+                                                    return (pName, mp,count)}) filtered)
   --mapM (\(pName, fs) -> do{mp <- searchPackage fs; evaluate mp $ return (pName, mp)}) files
   t2 <- getCurrentTime
   printTime "IO" t0 t1
   printTime "search" t1 t2
   putStrLn $ "Total number of packages searched: " ++ (show (length maps))
   return maps
+    where finishedPackages :: [(FilePath,[FilePath])] -> IO [(FilePath,[FilePath])]
+          finishedPackages files = do
+            fin <- readFile "finishedPackages.txt"
+            let lns = lines fin
+            return $ filter (\(pName, _) -> not (pName `elem` lns)) files
 
 exactPrintReport :: [(FilePath, DeclMap, (Int, Int,Int))] -> IO ()
 exactPrintReport pkgs = do

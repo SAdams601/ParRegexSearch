@@ -8,8 +8,8 @@ import Data.ByteString.Char8 (pack)
 import System.FilePath.Windows
 import qualified Data.ByteString as B
 import System.IO.Unsafe
-import Data.String.Utils
 import Control.Exception
+import Data.String.Utils
 
 type FileMatches = (FilePath ,[String])
 
@@ -56,9 +56,7 @@ getDirContentsByPred dir pred = do
           r dir fp = do
             status <- getFileStatus $ pack fp
             if isDirectory status
-              then if fp `endswith` "dist"
-                   then return []
-                   else getDirContentsByPred fp pred
+              then getDirContentsByPred fp pred
               else do
               b <- pred fp
               if b
@@ -70,23 +68,26 @@ getDirContentsByPred dir pred = do
      
 
 getFileNamesByPred :: FilePath -> (FilePath -> IO Bool) -> IO [FilePath]
-getFileNamesByPred dir pred = do
-  abs <- makeAbsolute dir
-  dirContents <- listDirectory dir
-  let files = map (fixFP abs) dirContents
-  res <- mapM (r abs) files
-  return $ foldl (++) [] res
-    where
-      fixFP dir fp = dir ++ "/" ++ fp
-      r dir fp = do
-        status <- getFileStatus $ pack fp
-        if isDirectory status
-          then getFileNamesByPred fp pred
-          else do
-          b <- pred fp
-          if b
-            then return [fp]
-            else return []
+getFileNamesByPred dir pred =
+  if endswith "dist" dir
+  then return []
+  else do
+    abs <- makeAbsolute dir
+    dirContents <- listDirectory dir
+    let files = map (fixFP abs) dirContents
+    res <- mapM (r abs) files
+    return $ foldl (++) [] res
+      where
+        fixFP dir fp = dir ++ "/" ++ fp
+        r dir fp = do
+          status <- getFileStatus $ pack fp
+          if isDirectory status
+            then  getFileNamesByPred fp pred
+            else do
+            b <- pred fp
+            if b
+              then return [fp]
+              else return []
             
         
 

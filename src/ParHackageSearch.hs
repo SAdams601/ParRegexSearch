@@ -35,6 +35,7 @@ getAllFileNames fp = do
 
 searchPred fp = let ext = takeExtension fp in
   return $ ext == ".hs"
+  
 readDir fp = do
   contents <- getDirContentsByPred fp searchPred
   return (fp, contents)
