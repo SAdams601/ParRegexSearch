@@ -15,6 +15,8 @@ import System.IO
 import ExactPrintSearch
 import System.Mem
 import SearchOutputFile
+import CountParseErrors
+
 
 main :: IO ()
 main = do
